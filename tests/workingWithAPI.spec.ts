@@ -1,12 +1,25 @@
 import { test, expect } from '@playwright/test';
 import tags from "../test-data/tags.json"
 
-test.beforeEach(async ({ page }) => {
+let random: number;
+let accessToken: string;
+
+test.beforeEach(async ({ page, request }) => {
   await page.goto("https://conduit.bondaracademy.com/")
   await page.getByText("Sign in").click()
   await page.getByRole("textbox", { name: "Email" }).fill("gokay@test.com")
   await page.getByRole("textbox", { name: "Password" }).fill("test1234")
   await page.getByRole("button", { name: "Sign in" }).click()
+  // Generate a random integer in the range [1000, 5000]
+  random = Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000;
+
+  const response = await request.post("https://conduit-api.bondaracademy.com/api/users/login", {
+    data: {
+      user: { email: "gokay@test.com", password: "test1234" }
+    }
+  })
+  const responseBody = await response.json()
+  accessToken = responseBody.user.token
 })
 
 test('mock api - modify api response', async ({ page }) => {
@@ -34,16 +47,6 @@ test('mock api - modify api response', async ({ page }) => {
 });
 
 test("api request - delete article", async ({ page, request }) => {
-  const response = await request.post("https://conduit-api.bondaracademy.com/api/users/login", {
-    data: {
-      user: { email: "gokay@test.com", password: "test1234" }
-    }
-  })
-
-  const responseBody = await response.json()
-  const accessToken = responseBody.user.token
-  // Generate a random integer in the range [1000, 5000]
-  const random = Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000;
 
   const articleResponse = await request.post("https://conduit-api.bondaracademy.com/api/articles/", {
     data: {
@@ -53,7 +56,6 @@ test("api request - delete article", async ({ page, request }) => {
       Authorization: `Token ${accessToken}`
     }
   })
-
   expect(articleResponse.status()).toBe(201)
 
   await page.getByText("Global Feed").click()
@@ -61,6 +63,33 @@ test("api request - delete article", async ({ page, request }) => {
   await page.getByRole("button", { name: "Delete Article" }).first().click()
   await page.getByText("Global Feed").click()
   await expect(page.locator("app-article-list h1").first()).not.toContainText(`Test title ${random}`)
+
+})
+
+test("create article - delete article - waitForResponse", async({page}) => {
+  await page.getByText("New Article").click()
+  await page.getByRole("textbox", {name: "Article Title"}).fill(`Test title ${random}`)
+  await page.getByRole("textbox", {name: "What's this article about?"}).fill(`Test description ${random}`)
+  await page.getByRole("textbox", {name: "Write your article (in markdown)"}).fill(`Test body ${random}`)
+  await page.getByRole("button", {name: "Publish Article"}).click()
+  const articleResponse = await page.waitForResponse("https://conduit-api.bondaracademy.com/api/articles/")
+  const articleResponseBody = await articleResponse.json()
+  const slugId = articleResponseBody.article.slug
+  await expect(page.locator(".article-page h1")).toHaveText(`Test title ${random}`)
+
+  await page.getByText("Home").click()
+  await page.getByText("Global Feed").click()
+  await expect(page.locator("app-article-list h1").first()).toHaveText(`Test title ${random}`)
+
+  const deleteArticleResponse = await page.request.delete(`https://conduit-api.bondaracademy.com/api/articles/${slugId}`, {
+    headers: {
+      Authorization: `Token ${accessToken}`
+    }
+  })
+  expect(deleteArticleResponse.status()).toBe(204)
+
+  await page.getByText("Global Feed").click()
+  await expect(page.locator("app-article-list h1").first()).not.toHaveText(`Test title ${random}`)
 
 
 })
