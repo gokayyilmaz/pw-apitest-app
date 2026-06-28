@@ -2,20 +2,11 @@ import { test, expect } from '@playwright/test';
 import tags from "../test-data/tags.json"
 
 let random: number;
-let accessToken: string;
 
 test.beforeEach(async ({ page, request }) => {
   // Generate a random integer in the range [1000, 5000]
   random = Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000;
   await page.goto("https://conduit.bondaracademy.com/")
-
-  const response = await request.post("https://conduit-api.bondaracademy.com/api/users/login", {
-    data: {
-      user: { email: "gokay@test.com", password: "test1234" }
-    }
-  })
-  const responseBody = await response.json()
-  accessToken = responseBody.user.token
 })
 
 test('mock api - modify api response', async ({ page }) => {
@@ -47,9 +38,6 @@ test("api request - delete article", async ({ page, request }) => {
   const articleResponse = await request.post("https://conduit-api.bondaracademy.com/api/articles/", {
     data: {
       article: { title: `Test title ${random}`, description: `Test description ${random}`, body: `Test body ${random}`, tagList: [] }
-    },
-    headers: {
-      Authorization: `Token ${accessToken}`
     }
   })
   expect(articleResponse.status()).toBe(201)
@@ -77,16 +65,11 @@ test("create article - delete article - waitForResponse", async ({ page }) => {
   await page.getByText("Global Feed").click()
   await expect(page.locator("app-article-list h1").first()).toHaveText(`Test title ${random}`)
 
-  const deleteArticleResponse = await page.request.delete(`https://conduit-api.bondaracademy.com/api/articles/${slugId}`, {
-    headers: {
-      Authorization: `Token ${accessToken}`
-    }
-  })
+  const deleteArticleResponse = await page.request.delete(`https://conduit-api.bondaracademy.com/api/articles/${slugId}`)
   expect(deleteArticleResponse.status()).toBe(204)
 
   await page.getByText("Global Feed").click()
   await expect(page.locator("app-article-list h1").first()).not.toHaveText(`Test title ${random}`)
-
 
 })
 
