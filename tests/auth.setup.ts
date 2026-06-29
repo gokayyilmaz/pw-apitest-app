@@ -20,10 +20,28 @@ setup("authentication", async ({ request }) => {
   })
   const responseBody = await response.json()
   const accessToken = responseBody.user.token
-  user.origins[0].localStorage[0].value = accessToken
-  console.log(JSON.stringify(user))
-  fs.writeFileSync(authFile, JSON.stringify(user))
 
+  // Create auth directory if it doesn't exist
+  if (!fs.existsSync('.auth')) {
+    fs.mkdirSync('.auth', { recursive: true })
+  }
+
+  // Initialize user object structure
+  const user = {
+    origins: [
+      {
+        origin: "https://conduit.bondaracademy.com",
+        localStorage: [
+          {
+            name: "jwtToken",
+            value: accessToken
+          }
+        ]
+      }
+    ]
+  }
+
+  fs.writeFileSync(authFile, JSON.stringify(user))
   process.env['ACCESS_TOKEN'] = accessToken
 
 })
